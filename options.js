@@ -1,12 +1,13 @@
 const DEFAULT_CONFIG = {
   enabled: true,
   mode: "hide",
-  aggressive: false,
+  aggressive: true,
   keywords: [
     "trump", "donald trump", "дональд трамп", "трамп",
     "putin", "vladimir putin", "владимир путин", "путин", "путін", "володимир путін",
     "zelensky", "zelenskiy", "zelenskyy", "volodymyr zelensky",
-    "владимир зеленский", "володимир зеленський", "зеленский", "зеленський"
+    "владимир зеленский", "володимир зеленський", "зеленский", "зеленський",
+    "Украина", "Украины", "Україна", "ukraine", "ukrainian"
   ],
   allowlist: [],
   blocklist: []

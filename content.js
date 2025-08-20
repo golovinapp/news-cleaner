@@ -18,6 +18,17 @@ const DEFAULT_CONFIG = {
   blocklist: []
 };
 
+let hiddenCount = 0;
+let reportScheduled = false;
+function reportCount() {
+  if (reportScheduled) return;
+  reportScheduled = true;
+  setTimeout(() => {
+    reportScheduled = false;
+    chrome.runtime.sendMessage({ type: 'nc_count', count: hiddenCount });
+  }, 250); // throttling
+}
+
 // ==== Site-specific selectors ====
 const SITE_EXTRA_SELECTORS = {
   "lenta.ru": [
@@ -201,6 +212,8 @@ function markHide(el) {
   el.classList.add(HIDE_CLASS());
   el.dataset.tpzHidden = "1";
   addRevealButton(el);
+  hiddenCount++;
+  reportCount();
 }
 
 function findContainer(node) {
@@ -268,6 +281,7 @@ function scheduleScan(target) {
 
 // ==== Init ====
 loadConfig().then(() => {
+  hiddenCount = 0;
   scan(document);
 
   const mo = new MutationObserver(muts => {

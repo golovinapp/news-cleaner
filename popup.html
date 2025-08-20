@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>News Cleaner</title>
+  <style>
+    :root { color-scheme: light dark; }
+    body { margin: 0; width: 320px; font: 14px/1.4 system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; }
+    header { padding: 12px; display: flex; align-items: center; gap: 8px; border-bottom: 1px solid #e5e5e5; }
+    header img { width: 20px; height: 20px; }
+    h1 { margin: 0; font-size: 14px; }
+    .host { color: #666; font-size: 12px; }
+    .section { padding: 12px; border-bottom: 1px solid #f0f0f0; }
+    .count { font-weight: 600; font-size: 24px; }
+    .muted { color: #666; font-size: 12px; }
+    .btn { display:inline-block; padding:8px 10px; border:1px solid #ddd; border-radius:8px; cursor:pointer; user-select:none; }
+    .btn + .btn { margin-left: 8px; }
+    .btn-primary { border-color:#2a77ff; }
+    .row { display:flex; align-items:center; justify-content:space-between; gap:8px; }
+    .stack { display:flex; gap:8px; flex-wrap:wrap; }
+  </style>
+</head>
+<body>
+  <header>
+    <img src="icons/icon-16.png" alt="">
+    <div>
+      <h1>News Cleaner</h1>
+      <div class="host" id="host">—</div>
+    </div>
+  </header>
+
+  <div class="section">
+    <div class="row">
+      <div>
+        <div class="muted">Blocked on this page</div>
+        <div class="count" id="count">0</div>
+      </div>
+      <div id="status" class="muted">Enabled</div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="stack">
+      <button id="toggle-global" class="btn btn-primary">Disable everywhere</button>
+      <button id="toggle-site" class="btn">Pause on this site</button>
+      <button id="open-settings" class="btn">Open settings</button>
+    </div>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
