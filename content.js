@@ -1,4 +1,4 @@
-// News Cleaner — content script (MV3) — v1.1.0
+// News Cleaner — content script (MV3) — v1.3.0 (инфлекции RU/UK + possessive EN + авто-несклоняемые)
 
 // ==== Конфиг по умолчанию ====
 const DEFAULT_CONFIG = {
@@ -14,9 +14,8 @@ const DEFAULT_CONFIG = {
     "zelensky", "zelenskiy", "zelenskyy", "volodymyr zelensky",
     "владимир зеленский", "володимир зеленський", "зеленский", "зеленський"
   ],
-  // Доменные списки
-  allowlist: [], // если непустой — фильтр работает только на доменах из этого списка
-  blocklist: []  // домены, где фильтр принудительно отключён
+  allowlist: [],
+  blocklist: []
 };
 
 // ==== Доменные особенности (селекторы) ====
@@ -74,23 +73,91 @@ function loadConfig() {
 function currentHost() {
   try { return location.hostname.replace(/^www\./, ""); } catch (_) { return ""; }
 }
-
 function isDomainAllowed() {
   const host = currentHost();
   if (state.blocklist.includes(host)) return false;
   if (state.allowlist.length > 0) return state.allowlist.includes(host);
-  return true; // по умолчанию разрешаем
+  return true;
 }
 
-// ==== Матчинг по regex с границами слова ====
+// ==== Матчинг по regex с учётом форм ====
 let keywordRegexes = [];
+
+function reEscape(s) {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+function isLatin(s) { return /^[\p{Script=Latin}\s'’.-]+$/u.test(s); }
+function isCyrillicWord(s) { return /^[\p{Script=Cyrillic}-]+$/u.test(s); }
+
+// === NEW: эвристика "несклоняемое кириллическое слово"
+function isLikelyIndeclinableCyrillic(base) {
+  // Акронимы/аббревиатуры в верхнем регистре (США, МВД, ООН)
+  if (base === base.toUpperCase() && /^[\p{Lu}\d\-.]+$/u.test(base)) return true;
+  const w = base.toLowerCase();
+  // Окончание на гласные, типично несклоняемые топонимы/заимствования: о, е, ё, э, и, і, у, ю
+  if (/[оеёэииіую]$/u.test(w)) return true; // заметка: "ё" юникод-комбинированное может не попасть — см. след. строку
+  if (/[оёеэиію]$/u.test(w)) return true;     // продублировали без комб. диакритик для надёжности
+  return false;
+}
+
+// Существительные (Путин/Путін/Трамп/Бангладеш и т.п.)
+function buildNounCyrillicPattern(base) {
+  if (isLikelyIndeclinableCyrillic(base)) {
+    return reEscape(base); // без окончаний
+  }
+  // Частые падежные окончания RU/UK (грубо, но эффективно)
+  const endings = "(а|я|у|ю|ом|ем|е|і|ы|и|ой|ою|ях|ям|ями|ах|ам|ами|ов|ев)?";
+  return reEscape(base) + endings;
+}
+
+// Прилагательные типа «Зеленский / Зеленський / Зький»
+function looksLikeAdjCyr(word) {
+  return /(ский|ський|зький)$/u.test(word);
+}
+function buildAdjectiveCyrillicPattern(word) {
+  const stem = word
+    .replace(/ский$/u, "ск")
+    .replace(/зький$/u, "зьк")
+    .replace(/ський$/u, "ськ");
+  const endings =
+    "(ий|ого|ому|ым|им|ом|ая|ую|ое|ие|ые|ых|ыми|ими|" +  // RU
+    "ій|ього|ьому|ім|им|ому|а|у|е|і|ої|ою|ими|их)?";     // UK (упрощённо)
+  return reEscape(stem) + endings;
+}
+
+// Латиница: допускаем possessive 's / ’s
+function buildLatinPattern(word) {
+  const esc = reEscape(word);
+  return esc + "(?:'s|’s)?";
+}
+
 function rebuildRegexes() {
-  keywordRegexes = state.keywordsLower.map(k => {
-    const esc = k.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    // границы по буквенно-цифровым символам (Unicode)
-    const pattern = `(?<![\\p{L}\\p{M}\\p{N}_])${esc}(?![\\p{L}\\p{M}\\p{N}_])`;
-    return new RegExp(pattern, "iu");
-  });
+  keywordRegexes = state.keywordsLower.map(raw => {
+    const kw = raw.trim();
+    if (!kw) return null;
+
+    // Фразы из нескольких слов — матчим как есть (без инфлексий)
+    if (/\s/.test(kw)) {
+      const esc = reEscape(kw);
+      return new RegExp(`(?<![\\p{L}\\p{M}\\p{N}_])${esc}(?![\\p{L}\\p{M}\\p{N}_])`, "iu");
+    }
+
+    let body;
+    if (isLatin(kw)) {
+      body = buildLatinPattern(kw);
+    } else if (isCyrillicWord(kw)) {
+      body = looksLikeAdjCyr(kw)
+        ? buildAdjectiveCyrillicPattern(kw)
+        : buildNounCyrillicPattern(kw);
+    } else {
+      body = reEscape(kw);
+    }
+
+    return new RegExp(
+      `(?<![\\p{L}\\p{M}\\p{N}_])${body}(?![\\p{L}\\p{M}\\p{N}_])`,
+      "iu"
+    );
+  }).filter(Boolean);
 }
 
 function textMatches(text) {
@@ -114,7 +181,6 @@ function getRelevantText(el) {
 }
 
 function addRevealButton(el) {
-  // оборачиваем, чтобы разместить кнопку в относительном контейнере
   if (!el.parentNode) return;
   const wrapper = document.createElement("div");
   wrapper.style.position = "relative";
@@ -151,7 +217,6 @@ function findContainer(node) {
       '.article, .story, .card, .post, .teaser, .news, ' +
       '[class*="article"], [class*="story"], [class*="card"], [class*="post"], [class*="news"]'
     )) return el;
-
     if (typeof el.className === "string" && /(^|\s)card-/.test(el.className)) return el; // lenta.ru
     el = el.parentElement;
   }
@@ -171,7 +236,6 @@ function candidates(root = document) {
   const set = new Set();
   root.querySelectorAll(base.join(",")).forEach(el => set.add(el));
 
-  // заголовки/ссылки -> поднимаемся к контейнеру
   root.querySelectorAll('h1, h2, h3, h4, a[aria-label], a[href*="/news/"], a[href*="/articles/"]').forEach(h => {
     const txt = h.textContent && h.textContent.trim();
     if (txt && textMatches(txt)) set.add(findContainer(h));
@@ -209,7 +273,6 @@ function scheduleScan(target) {
 // ==== Инициализация ====
 loadConfig().then(() => {
   scan(document);
-
   const mo = new MutationObserver(muts => {
     if (!state.enabled) return;
     for (const m of muts) {
