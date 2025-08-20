@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>News Cleaner — настройки</title>
+<style>
+body { font: 14px/1.4 system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; margin: 24px; }
+.row { margin-bottom: 16px; }
+textarea { width: 100%; min-height: 180px; }
+label { display: flex; align-items: center; gap: 8px; }
+.hint { color: #666; font-size: 12px; }
+.btns { display: flex; gap: 8px; }
+button { padding: 8px 12px; }
+</style>
+</head>
+<body>
+<h1>News Cleaner — настройки</h1>
+
+
+<div class="row">
+<label><input type="checkbox" id="enabled" /> Включено</label>
+</div>
+
+
+<div class="row">
+<label>
+Режим отображения:
+<select id="mode">
+<option value="hide">Скрывать</option>
+<option value="blur">Размывать</option>
+</select>
+</label>
+</div>
+
+
+<div class="row">
+<label><input type="checkbox" id="aggressive" /> Агрессивный режим (сканировать больше блоков)</label>
+<div class="hint">Может лучше находить упоминания, но немного тяжелее для процессора на «тяжёлых» сайтах.</div>
+</div>
+
+
+<div class="row">
+<label for="keywords">Ключевые слова (по одному в строке):</label>
+<textarea id="keywords" spellcheck="false"></textarea>
+<div class="hint">По умолчанию добавлены варианты имён на RU/UK/EN. Можно расширять список своими словами.</div>
+</div>
+
+
+<div class="btns">
+<button id="save">Сохранить</button>
+<button id="reset" type="button">Сбросить к значениям по умолчанию</button>
+</div>
+
+
+<p class="hint">Изменения вступают в силу сразу. При необходимости просто обновите открытую вкладку с новостями.</p>
+
+
+<script src="options.js"></script>
+</body>
+</html>
