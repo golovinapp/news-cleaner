@@ -44,7 +44,7 @@ function save() {
   chrome.storage.sync.set(cfg, () => {
     const btn = $("save");
     const old = btn.textContent;
-    btn.textContent = "Сохранено ✓";
+    btn.textContent = "Saved ✓";
     setTimeout(() => (btn.textContent = old), 1200);
   });
 }

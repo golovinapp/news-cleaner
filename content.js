@@ -1,10 +1,10 @@
-// News Cleaner — content script (MV3) — v1.3.0 (инфлекции RU/UK + possessive EN + авто-несклоняемые)
+// News Cleaner — content script (MV3) — v1.3.0 (inflections RU/UK + possessive EN + auto-indeclinable)
 
-// ==== Конфиг по умолчанию ====
+// ==== Default config ====
 const DEFAULT_CONFIG = {
   enabled: true,
   mode: "hide",          // "hide" | "blur"
-  aggressive: false,     // если true — анализируем больше контейнеров
+  aggressive: false,     // scan more container types
   keywords: [
     // Trump
     "trump", "donald trump", "дональд трамп", "трамп",
@@ -18,7 +18,7 @@ const DEFAULT_CONFIG = {
   blocklist: []
 };
 
-// ==== Доменные особенности (селекторы) ====
+// ==== Site-specific selectors ====
 const SITE_EXTRA_SELECTORS = {
   "lenta.ru": [
     '[class^="card-"]', '[class*=" card-"]',
@@ -36,7 +36,7 @@ let state = {
   blocklist: []
 };
 
-// ==== Стили ====
+// ==== Styles ====
 (function injectStyles() {
   if (document.getElementById("tpz-style")) return;
   const style = document.createElement("style");
@@ -53,7 +53,7 @@ let state = {
   document.documentElement.appendChild(style);
 })();
 
-// ==== Загрузка настроек ====
+// ==== Load config ====
 function loadConfig() {
   return new Promise(resolve => {
     chrome.storage.sync.get(DEFAULT_CONFIG, (cfg) => {
@@ -69,7 +69,7 @@ function loadConfig() {
   });
 }
 
-// ==== Доменные правила ====
+// ==== Domain rules ====
 function currentHost() {
   try { return location.hostname.replace(/^www\./, ""); } catch (_) { return ""; }
 }
@@ -80,7 +80,7 @@ function isDomainAllowed() {
   return true;
 }
 
-// ==== Матчинг по regex с учётом форм ====
+// ==== Matching with inflections ====
 let keywordRegexes = [];
 
 function reEscape(s) {
@@ -89,28 +89,25 @@ function reEscape(s) {
 function isLatin(s) { return /^[\p{Script=Latin}\s'’.-]+$/u.test(s); }
 function isCyrillicWord(s) { return /^[\p{Script=Cyrillic}-]+$/u.test(s); }
 
-// === NEW: эвристика "несклоняемое кириллическое слово"
+// Indeclinable Cyrillic heuristic
 function isLikelyIndeclinableCyrillic(base) {
-  // Акронимы/аббревиатуры в верхнем регистре (США, МВД, ООН)
-  if (base === base.toUpperCase() && /^[\p{Lu}\d\-.]+$/u.test(base)) return true;
+  if (base === base.toUpperCase() && /^[\p{Lu}\d\-.]+$/u.test(base)) return true; // acronyms like США
   const w = base.toLowerCase();
-  // Окончание на гласные, типично несклоняемые топонимы/заимствования: о, е, ё, э, и, і, у, ю
-  if (/[оеёэииіую]$/u.test(w)) return true; // заметка: "ё" юникод-комбинированное может не попасть — см. след. строку
-  if (/[оёеэиію]$/u.test(w)) return true;     // продублировали без комб. диакритик для надёжности
+  if (/[оёеёэииіую]$/u.test(w)) return true; // ends with vowels typical for indeclinables
+  if (/[оёеэиію]$/u.test(w)) return true;
   return false;
 }
 
-// Существительные (Путин/Путін/Трамп/Бангладеш и т.п.)
+// Nouns
 function buildNounCyrillicPattern(base) {
   if (isLikelyIndeclinableCyrillic(base)) {
-    return reEscape(base); // без окончаний
+    return reEscape(base);
   }
-  // Частые падежные окончания RU/UK (грубо, но эффективно)
   const endings = "(а|я|у|ю|ом|ем|е|і|ы|и|ой|ою|ях|ям|ями|ах|ам|ами|ов|ев)?";
   return reEscape(base) + endings;
 }
 
-// Прилагательные типа «Зеленский / Зеленський / Зький»
+// Adjectives like "Зеленский / Зеленський / Зький"
 function looksLikeAdjCyr(word) {
   return /(ский|ський|зький)$/u.test(word);
 }
@@ -121,11 +118,11 @@ function buildAdjectiveCyrillicPattern(word) {
     .replace(/ський$/u, "ськ");
   const endings =
     "(ий|ого|ому|ым|им|ом|ая|ую|ое|ие|ые|ых|ыми|ими|" +  // RU
-    "ій|ього|ьому|ім|им|ому|а|у|е|і|ої|ою|ими|их)?";     // UK (упрощённо)
+    "ій|ього|ьому|ім|им|ому|а|у|е|і|ої|ою|ими|их)?";     // UK simplified
   return reEscape(stem) + endings;
 }
 
-// Латиница: допускаем possessive 's / ’s
+// Latin: allow possessive 's / ’s
 function buildLatinPattern(word) {
   const esc = reEscape(word);
   return esc + "(?:'s|’s)?";
@@ -136,7 +133,6 @@ function rebuildRegexes() {
     const kw = raw.trim();
     if (!kw) return null;
 
-    // Фразы из нескольких слов — матчим как есть (без инфлексий)
     if (/\s/.test(kw)) {
       const esc = reEscape(kw);
       return new RegExp(`(?<![\\p{L}\\p{M}\\p{N}_])${esc}(?![\\p{L}\\p{M}\\p{N}_])`, "iu");
@@ -166,7 +162,7 @@ function textMatches(text) {
   return keywordRegexes.some(rx => rx.test(s));
 }
 
-// ==== Поиск текста и контейнеров ====
+// ==== Extraction & hiding ====
 const processed = new WeakSet();
 const HIDE_CLASS = () => (state.mode === "blur" ? "tpz-blur" : "tpz-hidden");
 
@@ -189,7 +185,7 @@ function addRevealButton(el) {
 
   const btn = document.createElement("button");
   btn.className = "tpz-reveal-btn";
-  btn.textContent = "Показать";
+  btn.textContent = "Show";
   wrapper.appendChild(btn);
 
   btn.addEventListener("click", () => {
@@ -259,7 +255,7 @@ function scan(root = document) {
   }
 }
 
-// ==== Дебаунс для MutationObserver ====
+// ==== MutationObserver debounce ====
 let scheduled = false;
 function scheduleScan(target) {
   if (scheduled) return;
@@ -270,9 +266,10 @@ function scheduleScan(target) {
   });
 }
 
-// ==== Инициализация ====
+// ==== Init ====
 loadConfig().then(() => {
   scan(document);
+
   const mo = new MutationObserver(muts => {
     if (!state.enabled) return;
     for (const m of muts) {
@@ -284,7 +281,7 @@ loadConfig().then(() => {
   mo.observe(document.documentElement, { childList: true, subtree: true });
 });
 
-// ==== Горячие изменения настроек ====
+// ==== Hot config updates ====
 chrome.storage.onChanged.addListener((changes, area) => {
   if (area !== "sync") return;
   let needRescan = false;
