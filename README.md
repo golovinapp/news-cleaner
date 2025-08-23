@@ -1,5 +1,7 @@
 # 📰 News Cleaner  
 
+Install from [Google Web Store](https://chrome.google.com/webstore/detail/gnpjiekbgmnapiliihemhhnfjnkagppc)
+
 Tired of seeing the same faces everywhere?  
 Putin, Kardashians, or yet another flat Earth theory?  
 Say no more — **News Cleaner** has your back! 🚀  
